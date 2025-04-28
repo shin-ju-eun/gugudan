@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>구구단 퀴즈</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap');
+
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+            margin: 0;
+            color: #333;
+        }
+
+        .container {
+            background-color: #ffffff;
+            padding: 30px 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+            text-align: center;
+            width: 90%;
+            max-width: 500px;
+        }
+
+        h1 {
+            color: #ff6f61;
+            margin-bottom: 20px;
+        }
+
+        #timer {
+            font-size: 1.1em;
+            color: #555;
+            margin-bottom: 15px;
+            font-weight: bold;
+            background-color: #f0f0f0;
+            padding: 8px 15px;
+            border-radius: 20px;
+            display: inline-block;
+        }
+
+        #quiz-area {
+            margin-top: 20px;
+        }
+
+        #question-info {
+            font-size: 1.1em;
+            color: #666;
+            margin-bottom: 20px;
+        }
+
+        #problem {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #4a4a4a;
+            margin: 25px 0;
+            padding: 15px;
+            background-color: #eefcff;
+            border-radius: 10px;
+            border: 1px solid #cceeff;
+        }
+
+        #answer {
+            width: 60%;
+            padding: 12px 15px;
+            font-size: 1.2em;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            text-align: center;
+            margin-bottom: 15px;
+            box-sizing: border-box; /* Include padding and border in the element's total width and height */
+            transition: border-color 0.3s ease;
+        }
+
+        #answer:focus {
+            border-color: #ff6f61;
+            outline: none;
+        }
+
+        /* Hide number input spinners */
+        #answer::-webkit-outer-spin-button,
+        #answer::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        #answer[type=number] {
+            -moz-appearance: textfield; /* Firefox */
+        }
+
+
+        #feedback {
+            min-height: 25px;
+            margin-top: 10px;
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+
+        .correct {
+            color: #28a745;
+        }
+
+        .incorrect {
+            color: #dc3545;
+        }
+
+        .try-again {
+            color: #ffc107;
+        }
+
+        button {
+            background-color: #ff6f61;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            font-size: 1.1em;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.1s ease;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            background-color: #e65a50;
+        }
+
+        button:active {
+             transform: scale(0.98);
+        }
+
+        #results-area {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #f9f9f9;
+            border-radius: 10px;
+        }
+
+         #results-area h2 {
+            color: #ff6f61;
+            margin-bottom: 15px;
+         }
+
+        #score, #total-time {
+            font-size: 1.3em;
+            color: #333;
+            margin: 10px 0;
+        }
+
+        /* Hide elements initially */
+        #results-area {
+            display: none;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 신나는 구구단 퀴즈! 🚀</h1>
+
+        <div id="timer">시간: 00:00</div>
+
+        <div id="quiz-area">
+            <div id="question-info">문제 1 / 15</div>
+            <div id="problem">? × ? =</div>
+            <input type="number" id="answer" placeholder="정답 입력" autocomplete="off">
+            <br>
+            <button id="submit-btn">정답 확인</button>
+            <p id="feedback"></p>
+        </div>
+
+        <div id="results-area">
+            <h2>🎉 퀴즈 결과 🎉</h2>
+            <p id="score">맞은 개수: 0 / 15</p>
+            <p id="total-time">총 걸린 시간: 00:00</p>
+            <button id="retry-btn">다시하기</button>
+        </div>
+    </div>
+
+    <script>
+        // --- DOM Elements ---
+        const quizArea = document.getElementById('quiz-area');
+        const resultsArea = document.getElementById('results-area');
+        const timerDisplay = document.getElementById('timer');
+        const questionInfoDisplay = document.getElementById('question-info');
+        const problemDisplay = document.getElementById('problem');
+        const answerInput = document.getElementById('answer');
+        const submitButton = document.getElementById('submit-btn');
+        const feedbackDisplay = document.getElementById('feedback');
+        const scoreDisplay = document.getElementById('score');
+        const totalTimeDisplay = document.getElementById('total-time');
+        const retryButton = document.getElementById('retry-btn');
+
+        // --- Quiz State ---
+        const TOTAL_QUESTIONS = 15;
+        let questions = [];
+        let currentQuestionIndex = 0;
+        let score = 0;
+        let attemptsLeft = 2;
+        let timerInterval;
+        let startTime;
+        let elapsedTime = 0; // Track elapsed time in seconds
+
+        // --- Functions ---
+
+        // Generate random multiplication questions (2-9 times tables)
+        function generateQuestions() {
+            questions = [];
+            const usedPairs = new Set(); // Prevent duplicate questions if possible
+
+            while (questions.length < TOTAL_QUESTIONS) {
+                const num1 = Math.floor(Math.random() * 8) + 2; // 2 to 9
+                const num2 = Math.floor(Math.random() * 8) + 2; // 2 to 9
+                const pairString = `${Math.min(num1, num2)}x${Math.max(num1, num2)}`; // Store smaller number first for uniqueness check
+
+                // Add if not already used or if we've exhausted possibilities
+                if (!usedPairs.has(pairString) || usedPairs.size >= 64) { // 8*8 = 64 possible unique pairs
+                    usedPairs.add(pairString);
+                    questions.push({
+                        num1: num1,
+                        num2: num2,
+                        answer: num1 * num2
+                    });
+                }
+            }
+            // console.log(questions); // For debugging
+        }
+
+        // Format time in MM:SS format
+        function formatTime(totalSeconds) {
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = totalSeconds % 60;
+            return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }
+
+        // Start or update the timer
+        function startTimer() {
+            startTime = Date.now() - elapsedTime * 1000; // Adjust start time if resuming
+            clearInterval(timerInterval); // Clear any existing timer
+            timerInterval = setInterval(() => {
+                elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+                timerDisplay.textContent = `시간: ${formatTime(elapsedTime)}`;
+            }, 1000);
+        }
+
+        // Stop the timer
+        function stopTimer() {
+            clearInterval(timerInterval);
+        }
+
+        // Display the current question
+        function displayQuestion() {
+            if (currentQuestionIndex < TOTAL_QUESTIONS) {
+                const currentQuestion = questions[currentQuestionIndex];
+                questionInfoDisplay.textContent = `문제 ${currentQuestionIndex + 1} / ${TOTAL_QUESTIONS}`;
+                problemDisplay.textContent = `${currentQuestion.num1} × ${currentQuestion.num2} = ?`;
+                answerInput.value = '';
+                feedbackDisplay.textContent = '';
+                feedbackDisplay.className = ''; // Reset feedback class
+                answerInput.disabled = false;
+                submitButton.disabled = false;
+                answerInput.focus(); // Set focus to input field
+                attemptsLeft = 2; // Reset attempts for the new question
+            } else {
+                showResults();
+            }
+        }
+
+        // Check the user's answer
+        function checkAnswer() {
+            const userAnswer = parseInt(answerInput.value, 10);
+            const correctAnswer = questions[currentQuestionIndex].answer;
+
+            if (isNaN(userAnswer)) {
+                feedbackDisplay.textContent = '숫자를 입력해주세요!';
+                feedbackDisplay.className = 'incorrect';
+                return; // Don't count as an attempt if input is not a number
+            }
+
+            answerInput.disabled = true; // Disable input while checking
+            submitButton.disabled = true; // Disable button while checking
+
+            if (userAnswer === correctAnswer) {
+                score++;
+                feedbackDisplay.textContent = '정답입니다! 🎉';
+                feedbackDisplay.className = 'correct';
+                setTimeout(() => {
+                    currentQuestionIndex++;
+                    displayQuestion();
+                }, 1000); // Wait 1 second before next question
+            } else {
+                attemptsLeft--;
+                if (attemptsLeft > 0) {
+                    feedbackDisplay.textContent = `틀렸어요. 다시 시도해보세요! (남은 기회: ${attemptsLeft}번)`;
+                    feedbackDisplay.className = 'try-again';
+                    setTimeout(() => {
+                         feedbackDisplay.textContent = ''; // Clear feedback after a moment
+                         answerInput.value = ''; // Clear input
+                         answerInput.disabled = false; // Re-enable input
+                         submitButton.disabled = false; // Re-enable button
+                         answerInput.focus();
+                    }, 1500); // Keep feedback visible a bit longer
+                } else {
+                    feedbackDisplay.textContent = `틀렸습니다. 정답은 ${correctAnswer} 입니다. 😥`;
+                    feedbackDisplay.className = 'incorrect';
+                    setTimeout(() => {
+                        currentQuestionIndex++;
+                        displayQuestion();
+                    }, 1500); // Wait 1.5 seconds before next question
+                }
+            }
+        }
+
+        // Show the final results
+        function showResults() {
+            stopTimer();
+            quizArea.style.display = 'none';
+            resultsArea.style.display = 'block';
+            scoreDisplay.textContent = `맞은 개수: ${score} / ${TOTAL_QUESTIONS}`;
+            totalTimeDisplay.textContent = `총 걸린 시간: ${formatTime(elapsedTime)}`;
+            timerDisplay.style.display = 'none'; // Hide timer on results page
+        }
+
+        // Reset and restart the quiz
+        function retryQuiz() {
+            currentQuestionIndex = 0;
+            score = 0;
+            elapsedTime = 0; // Reset elapsed time
+            attemptsLeft = 2;
+            generateQuestions();
+            resultsArea.style.display = 'none';
+            quizArea.style.display = 'block';
+            timerDisplay.style.display = 'inline-block'; // Show timer again
+            timerDisplay.textContent = `시간: 00:00`; // Reset timer display immediately
+            startTimer();
+            displayQuestion();
+        }
+
+        // --- Event Listeners ---
+        submitButton.addEventListener('click', checkAnswer);
+        answerInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                checkAnswer();
+            }
+        });
+        retryButton.addEventListener('click', retryQuiz);
+
+        // --- Initialize Quiz ---
+        function initializeQuiz() {
+             generateQuestions();
+             startTimer();
+             displayQuestion();
+        }
+
+        // Start the quiz when the page loads
+        window.addEventListener('load', initializeQuiz);
+
+    </script>
+</body>
+</html>
